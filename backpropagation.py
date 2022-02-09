@@ -64,6 +64,7 @@ class Network:
         self.layers = layers
         self.loss = loss
         self.training_losses = []
+        self.validation_losses = []
 
     def forward_pass(self, inputs, expected):
         for layer in self.layers:
@@ -82,14 +83,19 @@ class Network:
         for layer in self.layers:
             layer.apply_gradients()
     
-    def train(self, minibatch_size, dataset, labels, epochs):
+    def train(self, minibatch_size, dataset, epochs):
         for epoch in range(epochs):
-            for i in range(0, len(dataset), minibatch_size):
-                outputs, loss = self.forward_pass(dataset[i:i+minibatch_size], labels[i:i+minibatch_size])
-                print("Epoch: {}, Loss: {}".format(epoch, loss), end="\r")
-                self.training_losses.append(loss)
-                self.backward_pass(labels[i:i+minibatch_size], outputs)
+            for i in range(0, len(dataset.training_set), minibatch_size):
+                outputs, training_loss = self.forward_pass(dataset.training_set[i:i+minibatch_size], dataset.training_labels[i:i+minibatch_size])
+                self.training_losses.append(training_loss)
+                self.backward_pass(dataset.training_labels[i:i+minibatch_size], outputs)
                 self.apply_gradients()
+
+                _, validation_loss = self.forward_pass(dataset.validation_set, dataset.validation_labels)
+                self.validation_losses.append(validation_loss)
+
+                print(f"Epoch: {epoch+1}, TL: {training_loss}, VL: {validation_loss}", end="\r")
+
     
     def predict(self, inputs):
         for layer in self.layers:
@@ -102,11 +108,12 @@ n = Network("mse", [
     Layer(n_inputs=10, n_neurons=4, learning_rate=0.1, activation="sigmoid")
 ])
 
-d = Dataset(50000, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02, True)
+d = Dataset(5000, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02, 0.7, 0.2, 0.1, True)
 
-n.train(minibatch_size=100, dataset=d.training_set, labels=d.labels, epochs=5)
+n.train(minibatch_size=100, dataset=d, epochs=20)
 
-plt.plot(n.training_losses)
+plt.plot(n.training_losses, label="Training Loss")
+plt.plot(n.validation_losses, label="Validation Loss")
 plt.xlabel("Minibatch")
 plt.ylabel("Loss")
 plt.show()

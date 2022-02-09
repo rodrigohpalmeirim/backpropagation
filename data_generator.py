@@ -50,34 +50,36 @@ class Cross(Shape):
 
 
 class Dataset:
-    def __init__(self, image_count, background_size, shapes, size_variation, pos_variation, outline, noise_amount, flatten=False):
+    def __init__(self, image_count, background_size, shapes, size_variation, pos_variation, outline, noise_amount, training_ratio, validation_ratio, test_ratio, flatten=False):
         self.background_size = background_size
         self.image_count = image_count
-        self.labels = []
         
-        if flatten:
-            self.training_set = np.zeros((image_count, background_size**2))
-            self.validation_set = np.zeros((image_count, background_size**2))
-            self.test_set = np.zeros((image_count, background_size**2))
-        else:
-            self.training_set = np.zeros((image_count, background_size, background_size))
-            self.validation_set = np.zeros((image_count, background_size, background_size))
-            self.test_set = np.zeros((image_count, background_size, background_size))
-    
+        images = []
+        labels = []
         for i in range(self.image_count):
             shape_size = (0.5 + uniform(-0.5, 0.5) * size_variation, 0.5 + uniform(-0.5, 0.5) * size_variation)
             shape_pos = (0.5 + uniform(-0.5, 0.5) * pos_variation, 0.5 + uniform(-0.5, 0.5) * pos_variation)
-            shape = shapes[i % len(shapes)](background_size, shape_size, shape_pos, outline, noise_amount).image
-            if flatten:
-                self.training_set[i] = np.array(shape.getdata())
-            else:
-                self.training_set[i] = np.array(shape.getdata()).reshape(background_size, background_size)
+            shape = shapes[i % len(shapes)](background_size, shape_size, shape_pos, outline, noise_amount).image.getdata()
+            if not flatten:
+                shape = np.array(shape).reshape(background_size, background_size)
+            images.append(np.array(shape))
             label = [0] * len(shapes)
             label[i % len(shapes)] = 1
-            self.labels.append(label)
+            labels.append(label)
+        
+        training_count = int(self.image_count * training_ratio)
+        validation_count = int(self.image_count * validation_ratio)
+        test_count = int(self.image_count * test_ratio)
+
+        self.training_set = np.array(images[:training_count])
+        self.training_labels = np.array(labels[:training_count])
+        self.validation_set = np.array(images[training_count:training_count + validation_count])
+        self.validation_labels = np.array(labels[training_count:training_count + validation_count])
+        self.test_set = np.array(images[training_count + validation_count:])
+        self.test_labels = np.array(labels[training_count + validation_count:])
     
     def show_data(self, count=25):
-        count = min(count, self.image_count)
+        count = min(count, len(self.training_set))
         columns = int(np.ceil(np.sqrt(count)))
         lines = int(np.ceil(count / columns))
         f, axarr = plt.subplots(lines, columns)
@@ -91,4 +93,4 @@ class Dataset:
 
 
 if __name__ == "__main__":
-    Dataset(500, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02).show_data()
+    Dataset(500, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02, 0.70, 0.2, 0.1).show_data()
