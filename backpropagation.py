@@ -1,16 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import configparser
 from data_generator import *
 from functions import *
 
 class Layer:
-    def __init__(self, n_inputs, n_neurons, learning_rate, activation):
+    def __init__(self, n_inputs, n_neurons, weight_range, bias_range, learning_rate, activation):
         self.activation = activation
         self.n_inputs = n_inputs
         self.n_neurons = n_neurons
         self.learning_rate = learning_rate
-        self.weights = np.random.rand(n_inputs, n_neurons)-0.5
-        self.biases = np.random.rand(n_neurons)-0.5
+        self.weights = np.random.uniform(-weight_range, weight_range, (n_inputs, n_neurons))
+        self.biases = np.random.uniform(-bias_range, bias_range, n_neurons)
         self.inputs = None
         self.sum = None
         self.weights_gradient = np.zeros((n_inputs, n_neurons))
@@ -22,7 +23,8 @@ class Layer:
         return activation_functions[self.activation](self.sum)
 
     def backward_pass(self, delta):
-        d_sum = activation_derivatives[self.activation](self.sum) * delta
+        jacobian = activation_derivatives[self.activation](self.sum)
+        d_sum = jacobian * delta
         self.weights_gradient = np.dot(self.inputs.T, d_sum)
         self.biases_gradient = np.sum(d_sum, axis=0)
         return np.dot(d_sum, self.weights.T)
@@ -35,23 +37,23 @@ class Layer:
 
 class SoftmaxLayer(Layer):
     def __init__(self, n_neurons):
-        super().__init__(n_neurons, n_neurons, 0, "softmax")
+        super().__init__(n_neurons, n_neurons, 0, 0, 0, "softmax")
         self.weights = None
         self.biases = None
 
     def forward_pass(self, inputs):
         self.inputs = inputs
-        return activation_functions[self.activation](inputs)
+        return softmax(inputs)
 
     def backward_pass(self, delta):
-        jacobian = activation_derivatives[self.activation](self.inputs)
-        return np.einsum('ij,ijk->ik', delta, jacobian)
+        jacobian = softmax_derivative(self.inputs)
+        return np.einsum("ij,ijk->ik", delta, jacobian)
 
     def apply_gradients(self):
         pass
 
 class Network:
-    def __init__(self, loss, layers):
+    def __init__(self, loss, layers=[]):
         self.layers = layers
         self.loss = loss
         self.training_losses = []
@@ -85,31 +87,68 @@ class Network:
                 self.validation_losses.append(validation_loss)
 
                 print(f"Epoch: {epoch+1}, TL: {training_loss:.3f}, VL: {validation_loss:.3f}", end="\r")
+        print()
 
     def predict(self, inputs):
         for layer in self.layers:
             inputs = layer.forward_pass(inputs)
         return inputs
 
-n = Network("cross_entropy", [
-    Layer(n_inputs=16**2, n_neurons=10, learning_rate=0.01, activation="relu"),
-    Layer(n_inputs=10, n_neurons=10, learning_rate=0.01, activation="relu"),
-    Layer(n_inputs=10, n_neurons=4, learning_rate=0.01, activation="relu"),
-    SoftmaxLayer(n_neurons=4)
-])
+if __name__ == "__main__":
+    config = configparser.ConfigParser()
+    config.read("config.ini")
 
-d = Dataset(5000, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02, 0.7, 0.1, 0.1, True)
+    # Create network
+    n = Network(config["GLOBALS"]["loss_function"])
 
-n.train(minibatch_size=100, dataset=d, epochs=20)
-print()
+    # Add layers
+    last_layer_neurons = int(config["DATASET"]["image_size"])**2
+    for l in config["LAYERS"].values():
+        params = eval(l)
+        if "activation" in params and params["activation"] == "softmax":
+            n.layers.append(SoftmaxLayer(last_layer_neurons))
+        else:
+            n.layers.append(Layer(
+                n_inputs=last_layer_neurons,
+                n_neurons=params["neurons"] if "neurons" in params else int(config["GLOBALS"]["neurons"]),
+                weight_range=params["weight_range"] if "weight_range" in params else float(config["GLOBALS"]["weight_range"]),
+                bias_range=params["bias_range"] if "bias_range" in params else float(config["GLOBALS"]["bias_range"]),
+                learning_rate=params["learning_rate"] if "learning_rate" in params else float(config["GLOBALS"]["learning_rate"]),
+                activation=params["activation"] if "activation" in params else config["GLOBALS"]["activation"]
+            ))
+            last_layer_neurons = params["neurons"]
 
-_, test_loss = n.forward_pass(d.test_set, d.test_labels)
-print("Test set loss:", test_loss)
+    # Generate dataset
+    d = Dataset(
+        int(config["DATASET"]["dataset_size"]),
+        int(config["DATASET"]["image_size"]),
+        eval(config["DATASET"]["shapes"]),
+        float(config["DATASET"]["size_variation"]),
+        float(config["DATASET"]["pos_variation"]),
+        float(config["DATASET"]["outline"]),
+        float(config["DATASET"]["noise_amount"]),
+        float(config["DATASET"]["training_ratio"]),
+        float(config["DATASET"]["validation_ratio"]),
+        float(config["DATASET"]["test_ratio"]),
+        flatten=True
+    )
 
-plt.plot(n.training_losses, label="Training Loss")
-plt.plot(n.validation_losses, label="Validation Loss")
-plt.hlines(test_loss, xmin=len(n.training_losses), xmax=len(n.training_losses)+50, colors="green", label="Test Loss")
-plt.legend()
-plt.xlabel("Minibatch")
-plt.ylabel("Loss")
-plt.show()
+    if bool(config["DATASET"]["show_dataset"]):
+        d.show_data()
+
+    # Train network
+    n.train(minibatch_size=int(config["GLOBALS"]["minibatch_size"]), dataset=d, epochs=int(config["GLOBALS"]["epochs"]))
+
+    # Test network
+    _, test_loss = n.forward_pass(d.test_set, d.test_labels)
+    print("Test set loss:", test_loss)
+
+    # Plot losses
+    plt.figure()
+    plt.plot(n.training_losses, label="Training Loss")
+    plt.plot(n.validation_losses, label="Validation Loss")
+    plt.hlines(test_loss, xmin=len(n.training_losses), xmax=len(n.training_losses)+50, colors="green", label="Test Loss")
+    plt.legend()
+    plt.xlabel("Minibatch")
+    plt.ylabel("Loss")
+    plt.show(block=True)

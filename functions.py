@@ -19,7 +19,6 @@ activation_functions = {
     "tanh": lambda x: np.tanh(x),
     "relu": lambda x: np.maximum(0, x),
     "linear": lambda x: x,
-    "softmax": softmax
 }
     
 activation_derivatives = {
@@ -27,7 +26,6 @@ activation_derivatives = {
     "tanh": lambda x: 1 - np.power(activation_functions["tanh"](x), 2),
     "relu": lambda x: np.where(x > 0, 1, 0),
     "linear": lambda x: 1,
-    "softmax": softmax_derivative
 }
 
 loss_functions = {

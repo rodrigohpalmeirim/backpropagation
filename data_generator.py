@@ -89,8 +89,5 @@ class Dataset:
                     axarr[j][i].imshow(self.training_set[i + j * columns].reshape(self.background_size, self.background_size), cmap='gray')
                 axarr[j, i].axis('off')
         plt.tight_layout()
-        plt.show()
-
-
-if __name__ == "__main__":
-    Dataset(500, 16, [Ellipse, Rectangle, Triangle, Cross], 0.5, 0.5, 0.05, 0.02, 0.70, 0.2, 0.1).show_data()
+        plt.show(block=False)
+        plt.pause(0.1)
