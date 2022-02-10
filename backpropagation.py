@@ -24,8 +24,7 @@ class Layer:
         return activation_functions[self.activation](self.sum)
 
     def backward_pass(self, delta):
-        jacobian = activation_derivatives[self.activation](self.sum)
-        d_sum = jacobian * delta
+        d_sum = activation_derivatives[self.activation](self.sum) * delta
         self.weights_gradient = np.dot(self.inputs.T, d_sum)
         self.biases_gradient = np.sum(d_sum, axis=0)
         return np.dot(d_sum, self.weights.T)
