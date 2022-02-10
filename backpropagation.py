@@ -95,6 +95,10 @@ class Network:
         return inputs
 
 if __name__ == "__main__":
+    if len(argv) != 2:
+        print("Usage: python3 backpropagation.py <config_file>")
+        exit(1)
+
     config = configparser.ConfigParser()
     config.read(argv[1])
 
