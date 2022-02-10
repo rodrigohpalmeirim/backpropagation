@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import configparser
 from data_generator import *
 from functions import *
+from sys import argv
 
 class Layer:
     def __init__(self, n_inputs, n_neurons, weight_range, bias_range, learning_rate, activation):
@@ -86,7 +87,7 @@ class Network:
                 _, validation_loss = self.forward_pass(dataset.validation_set, dataset.validation_labels)
                 self.validation_losses.append(validation_loss)
 
-                print(f"Epoch: {epoch+1}, TL: {training_loss:.3f}, VL: {validation_loss:.3f}", end="\r")
+                print(f"Epoch: {epoch+1}, Training loss: {training_loss:.3f}, Validation loss: {validation_loss:.3f}", end="\r")
         print()
 
     def predict(self, inputs):
@@ -96,7 +97,7 @@ class Network:
 
 if __name__ == "__main__":
     config = configparser.ConfigParser()
-    config.read("config.ini")
+    config.read(argv[1])
 
     # Create network
     n = Network(config["GLOBALS"]["loss_function"])
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     last_layer_neurons = int(config["DATASET"]["image_size"])**2
     for l in config["LAYERS"].values():
         params = eval(l)
-        if "activation" in params and params["activation"] == "softmax":
+        if "type" in params and params["type"] == "softmax":
             n.layers.append(SoftmaxLayer(last_layer_neurons))
         else:
             n.layers.append(Layer(
